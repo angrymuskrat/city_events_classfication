@@ -72,7 +72,7 @@ output:
 '''
 def build_word2label(sem_model_path:str):
     # read semantic labels for words
-    with open(f'{sem_model_path}{suffix}labels.txt') as f:
+    with open(f'{sem_model_path}labels.txt') as f:
         labels = [line.split(',') for line in f]
     
     # filtering all exceptions (each row in labels.txt should look like 'word,label')
@@ -91,17 +91,20 @@ def build_word2label(sem_model_path:str):
 
 '''
 definition:
-    calculate normalized (for using cosine distance) vectors events by trained doc2vec model
+    calculate normalized (for using cosine distance) vectors events by semantic clusters of words
 input: 
-    df: pd.DataFrame - dataframe of events
-    d2v_path: str - path to the doc2vec model
+    df: pandas.DataFrame - dataframe of events
+    sem_model_path: str - path to the semantic model
+    n: int - number of semantic clusters
 output: 
+    df: pandas.DataFrame - dataframe of events wothut events for which not a single word is included in semantic clusters
     X: numpy 2d array - vectors for events
 '''
-def build_vectors_semantic(df: pd.DataFrame, sem_model_path:str):
+def build_vectors_semantic(df: pd.DataFrame, sem_model_path:str, n:int):
     from sklearn.preprocessing import StandardScaler
-
-    w2l = build_word2label(sem_model_path)
+    
+    sem_path = f'{sem_model_path}{n}/'
+    w2l = build_word2label(sem_path)
     
     # filtering words for which no semantic class is defined
     df['description'] = df['description'].apply(lambda s: ' '.join(filter(lambda w: w in w2l, s.split())))
@@ -122,7 +125,7 @@ def build_vectors_semantic(df: pd.DataFrame, sem_model_path:str):
     # scaling of semantic vectors
     scaler = StandardScaler()
     X = scaler.fit_transform(X)
-    return X
+    return df, X
 
 
 
@@ -414,11 +417,9 @@ definition:
 input: 
     n_semantic: list - 'y' of figure, different numbers of semantic clusters
     n_clusters: list - 'y' of figure, different numbers of events clusters
-    scores_df: pandas.DataFrame - dataframe of events clustering scores
-    x: str - name of abscissa for scores_df
-    y: str or list(str) - name or names scores for scores_df
-    x_title: str - name of abscissa for plot 
-    y_title: str - name of ordinate for plot
+    tmp_path: str - path to tmp dir
+    name_df: str - name of scores dataframe
+    scores_name: str - name of score
 output: 
     plolty.express.figure
 '''
