@@ -4,6 +4,7 @@ data
 notebooks/__pycache__
 
 notebooks/__pycache__/tools.cpython-37.pyc
+notebooks/.ipynb_checkpoints
 
 # files
 *-checkpoint.ipynb
