@@ -1,0 +1,6 @@
+#!/bin/bash
+
+PGPASSWORD=secretpwd psql -h 10.9.14.132 -U secretuser -d $1 -c "\copy (SELECT ID, Shortcode, ImageURL, IsVideo, Caption, CommentsCount, Timestamp, LikesCount, IsAd, AuthorID, LocationID, ST_X(Location) as Lat, ST_Y(Location) as Lon from posts where timestamp between 1483228800 and 1514764800) to '$1_posts_2017.csv' csv header;"
+PGPASSWORD=secretpwd psql -h 10.9.14.132 -U secretuser -d $1 -c "\copy (SELECT ID, Shortcode, ImageURL, IsVideo, Caption, CommentsCount, Timestamp, LikesCount, IsAd, AuthorID, LocationID, ST_X(Location) as Lat, ST_Y(Location) as Lon from posts where timestamp between 1514764800 and 1546300800) to '$1_posts_2018.csv' csv header;"
+PGPASSWORD=secretpwd psql -h 10.9.14.132 -U secretuser -d $1 -c "\copy (SELECT ID, Shortcode, ImageURL, IsVideo, Caption, CommentsCount, Timestamp, LikesCount, IsAd, AuthorID, LocationID, ST_X(Location) as Lat, ST_Y(Location) as Lon from posts where timestamp between 1546300800 and 1577836800) to '$1_posts_2019.csv' csv header;"
+PGPASSWORD=secretpwd psql -h 10.9.14.132 -U secretuser -d $1 -c "\copy (SELECT ID, Shortcode, ImageURL, IsVideo, Caption, CommentsCount, Timestamp, LikesCount, IsAd, AuthorID, LocationID, ST_X(Location) as Lat, ST_Y(Location) as Lon from posts where timestamp > 1577836800) to '$1_posts_2020.csv' csv header;"
