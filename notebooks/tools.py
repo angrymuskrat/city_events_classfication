@@ -5,46 +5,48 @@ import plotly.graph_objects as go
 
 
 
-'''
-definition:
-    set width of notebooks
-input: 
-    width: int - width in percent
-output: 
-    nothing
-'''
 def set_screen_width(width=50):
+    '''
+    definition:
+        set width of notebooks
+    input: 
+        width: int - width in percent
+    output: 
+        nothing
+    '''
     from IPython.core.display import display, HTML
     display(HTML("<style>.container { width:" + width + "% !important; }</style>"))
     return
 
 
 
-'''
-definition:
-    read dataset of events and split string with hashtags to array of hasgtags
-input: 
-    path: str - path to events dataset
-output: 
-    df: pandas.DataFrame - dataframe of events
-'''
-def read_events(path: str):
+def read_events(path: str, remove_hashtag_symbol=True):
+    '''
+    definition:
+        read dataset of events and split string with hashtags to array of hasgtags
+    input: 
+        path: str - path to events dataset
+    output: 
+        df: pandas.DataFrame - dataframe of events
+    '''
     df = pd.read_csv(path)
     df['tags'] = df['tags'].apply(lambda s: (s[1:-1]).replace("'", "").replace(' ', '').split(","))
+    if remove_hashtag_symbol:
+        df['description'] = df['description'].apply(lambda s: s.replace('#', '').replace('@', ''))
     return df
     
 
     
-'''
-definition:
-    calculate normalized (for using cosine distance) vectors events by trained doc2vec model
-input: 
-    df: pd.DataFrame - dataframe of events
-    d2v_path: str - path to the doc2vec model
-output: 
-    X: numpy 2d array - vectors for events
-'''
 def build_vectors_doc2vec(df: pd.DataFrame, d2v_path:str):
+    '''
+    definition:
+        calculate normalized (for using cosine distance) vectors events by trained doc2vec model
+    input: 
+        df: pd.DataFrame - dataframe of events
+        d2v_path: str - path to the doc2vec model
+    output: 
+        X: numpy 2d array - vectors for events
+    '''
     from gensim.models.doc2vec import Doc2Vec
     
     model = Doc2Vec.load(d2v_path + 'mdl')
@@ -62,15 +64,15 @@ def build_vectors_doc2vec(df: pd.DataFrame, d2v_path:str):
 
 
 
-'''
-definition:
-    build dictionary: word -> semantic label
-input: 
-    sem_model_path: str - path to the sem_model_path model
-output: 
-    w2l: dict <str,int> - dictionary of semantic labels
-'''
 def build_word2label(sem_model_path:str):
+    '''
+    definition:
+        build dictionary: word -> semantic label
+    input: 
+        sem_model_path: str - path to the sem_model_path model
+    output: 
+        w2l: dict <str,int> - dictionary of semantic labels
+    '''
     # read semantic labels for words
     with open(f'{sem_model_path}labels.txt') as f:
         labels = [line.split(',') for line in f]
@@ -89,18 +91,18 @@ def build_word2label(sem_model_path:str):
 
 
 
-'''
-definition:
-    calculate normalized (for using cosine distance) vectors events by semantic clusters of words
-input: 
-    df: pandas.DataFrame - dataframe of events
-    sem_model_path: str - path to the semantic model
-    n: int - number of semantic clusters
-output: 
-    df: pandas.DataFrame - dataframe of events wothut events for which not a single word is included in semantic clusters
-    X: numpy 2d array - vectors for events
-'''
 def build_vectors_semantic(df: pd.DataFrame, sem_model_path:str, n:int):
+    '''
+    definition:
+        calculate normalized (for using cosine distance) vectors events by semantic clusters of words
+    input: 
+        df: pandas.DataFrame - dataframe of events
+        sem_model_path: str - path to the semantic model
+        n: int - number of semantic clusters
+    output: 
+        df: pandas.DataFrame - dataframe of events wothut events for which not a single word is included in semantic clusters
+        X: numpy 2d array - vectors for events
+    '''
     from sklearn.preprocessing import StandardScaler
     
     sem_path = f'{sem_model_path}{n}/'
@@ -129,16 +131,16 @@ def build_vectors_semantic(df: pd.DataFrame, sem_model_path:str, n:int):
 
 
 
-'''
-definition:
-    calculate 2d embeddings for vectors of events for visualizations
-input: 
-    events_path: str - path to events dataset
-    d2v_path: str - path to the doc2vec model
-output: 
-    df: pandas.DataFrame - frame for events
-'''
 def calculate_2d(df: pd.DataFrame, X: np.array):
+    '''
+    definition:
+        calculate 2d embeddings for vectors of events for visualizations
+    input: 
+        df: pd.DataFrame - frame of events
+        X: np.array - 
+    output: 
+        df: pandas.DataFrame - frame of events with columns 'x' and 'y', which are 2d coordinate for events
+    '''
     from sklearn.manifold import TSNE
     tsne = TSNE(n_components=2, random_state=0, n_jobs=35, early_exaggeration=10, learning_rate=200)
     df['x'], df['y'] = list(zip(*tsne.fit_transform(X)))
@@ -146,44 +148,44 @@ def calculate_2d(df: pd.DataFrame, X: np.array):
 
 
 
-'''
-definition:
-    adds cluster labels to the event dataframe for each n of n_clusters by k-means algorithm on GPU
-input: 
-    n_clusters: list - a list of values of the number of clusters for which it is necessary 
-        to cluster
-    df: pandas.DataFrame - frame of events
-    X: 2d numpy.array - vectors of events
-    n_init: int - number of centroid initializations for calculating kmeans
-output: 
-    df: pandas.DataFrame - frame of events with calculated cluster labels
-'''
 def k_means_list(n_clusters: list, df: pd.DataFrame, X: np.array, n_init=50):
+    '''
+    definition:
+        adds cluster labels to the event dataframe for each n of n_clusters by k-means algorithm on GPU
+    input: 
+        n_clusters: list - a list of values of the number of clusters for which it is necessary 
+            to cluster
+        df: pandas.DataFrame - frame of events
+        X: 2d numpy.array - vectors of events
+        n_init: int - number of centroid initializations for calculating kmeans
+    output: 
+        df: pandas.DataFrame - frame of events with calculated cluster labels
+    '''
     from cuml.cluster import KMeans
     
     for n in n_clusters:
         n = int(n)
         row = [n]
-        labels = KMeans(n_clusters=n, n_init=50).fit(X).labels_
+        labels = KMeans(n_clusters=n, n_init=n_init).fit(X).labels_
         df[str(n)] = labels
     
     return df
 
 
 
-'''
-definition:
-    adds cluster labels to the event dataframe for each n of n_clusters by hierarchical clustering on CPU
-input: 
-    n_clusters: list - a list of values of the number of clusters for which it is necessary 
-        to cluster
-    df: pandas.DataFrame - frame of events
-    X: 2d numpy.array - vectors of events
-    linkage: str - sklearn.cluster.AgglomerativeClustering.linkage
-output: 
-    df: pandas.DataFrame - frame of events with calculated cluster labels
-'''
 def agglomerative_list(n_clusters: list, df: pd.DataFrame, X: np.array, linkage='ward'):
+    '''
+    definition:
+        adds cluster labels to the event dataframe for each n of n_clusters by hierarchical clustering on CPU
+    input: 
+        n_clusters: list - a list of values of the number of clusters for which it is necessary 
+            to cluster
+        df: pandas.DataFrame - frame of events
+        X: 2d numpy.array - vectors of events
+        linkage: str - sklearn.cluster.AgglomerativeClustering.linkage
+    output: 
+        df: pandas.DataFrame - frame of events with calculated cluster labels
+'''
     from sklearn.cluster import AgglomerativeClustering
     # return some element of set 
     def get_elem(s: set):
@@ -211,21 +213,21 @@ def agglomerative_list(n_clusters: list, df: pd.DataFrame, X: np.array, linkage=
 
 
 
-'''
-definition:
-    calculates metrics based on tagged event pairs for a given number of clusters
-input: 
-    n: int - number of clusters
-    df: pandas.DataFrame - frame of events
-    pair_df: pandas.DataFrame - frame of tagged pairs of events
-output: 
-    scores: list - return array of data_scores_names metrics 
-'''
 # names of metrics based on tagged event pairs
 data_scores_names = ['precision', 'recall', 'f1', 'rand', 'tp', 'tn', 'fp', 'fn']
 # defining tags for tagged event pairs
 pair_labels = {'positive': 2, 'negative': 1}
 def calc_scores(n: int, df: pd.DataFrame, pair_df: pd.DataFrame):
+    '''
+    definition:
+        calculates metrics based on tagged event pairs for a given number of clusters
+    input: 
+        n: int - number of clusters
+        df: pandas.DataFrame - frame of events
+        pair_df: pandas.DataFrame - frame of tagged pairs of events
+    output: 
+        scores: list - return array of data_scores_names metrics 
+    '''
     events = df[['id', str(n)]].values.tolist()
     tp, tn, fp, fn = 0, 0, 0, 0
     d = dict(events)
@@ -248,17 +250,17 @@ def calc_scores(n: int, df: pd.DataFrame, pair_df: pd.DataFrame):
 
 
 
-'''
-definition:
-    calculates metrics based on tagged event pairs for a given list of numbers of clusters
-input: 
-    n_clusters:list: int - list of numbers of clusters
-    df: pandas.DataFrame - frame of events
-    pair_df: pandas.DataFrame - frame of tagged pairs of events
-output: 
-    df_scores: pandas.DataFrame - return dataframe with data_scores_names for each number of clusters
-'''
 def calc_scores_list(n_clusters:list, df: pd.DataFrame, pairs_df: pd.DataFrame):
+    '''
+    definition:
+        calculates metrics based on tagged event pairs for a given list of numbers of clusters
+    input: 
+        n_clusters:list: int - list of numbers of clusters
+        df: pandas.DataFrame - frame of events
+        pair_df: pandas.DataFrame - frame of tagged pairs of events
+    output: 
+        df_scores: pandas.DataFrame - return dataframe with data_scores_names for each number of clusters
+    '''
     rows = []
     for n in n_clusters:
         row = [n] + calc_scores(n, df[['id', str(n)]], pairs_df)
@@ -271,16 +273,16 @@ def calc_scores_list(n_clusters:list, df: pd.DataFrame, pairs_df: pd.DataFrame):
 
 
 
-'''
-definition:
-    find n_clusters and value for given model and name of score
-input: 
-    scores_df: pandas.DataFrame - dataframe of events scores
-    score_name: str - name of the score
-output: 
-    dict{'name': str, 'value': float, 'n_clusters': int}
-'''
 def find_best_score(scores_df: pd.DataFrame, score_name: str):
+    '''
+    definition:
+        find n_clusters and value for given model and name of score
+    input: 
+        scores_df: pandas.DataFrame - dataframe of events scores
+        score_name: str - name of the score
+    output: 
+        dict{'name': str, 'value': float, 'n_clusters': int}
+    '''
     best_score = scores_df.iloc[scores_df[score_name].idxmax()]
     best = { 'name': score_name, 'value': best_score[score_name], 'n_clusters': int(best_score['n_clusters'])}
 
@@ -288,18 +290,19 @@ def find_best_score(scores_df: pd.DataFrame, score_name: str):
 
 
 
-'''
-definition:
-    find n_clusters, n_semantic, and value for given model and name of score
-input: 
-    n_semantic: list - list of semantic models
-    tmp_path: str - path to tmp directory, where scores files were stored 
-    df_name: str - name of the scores files
-    score_name: str - name of score
-output: 
-    dict{'name': str, 'value': float, 'n_clusters': int, 'n_semantic': int}
-'''
-def find_best_semantic_score(n_semantic: list, tmp_path:str, df_name:str, score_name:str):
+
+def find_best_2d_score(n_semantic: list, tmp_path:str, df_name:str, score_name:str):
+    '''
+    definition:
+        find n_clusters, n_semantic, and value for given model and name of score
+    input: 
+        n_semantic: list - list of semantic models
+        tmp_path: str - path to tmp directory, where scores files were stored 
+        df_name: str - name of the scores files
+        score_name: str - name of score
+    output: 
+        dict{'name': str, 'value': float, 'n_clusters': int, 'n_semantic': int}
+    '''
     best = {'name': score_name, 'value': 0, 'n_clusters': 0, 'n_semantic': 0}
 
     for n in n_semantic:
@@ -308,7 +311,7 @@ def find_best_semantic_score(n_semantic: list, tmp_path:str, df_name:str, score_
         scores_df = pd.read_csv(path + df_name)
 
         score = find_best_score(scores_df, score_name)
-        if score[score_name] > best['value']:
+        if score['value'] > best['value']:
             best = score
             best['n_semantic'] = n
 
@@ -316,32 +319,32 @@ def find_best_semantic_score(n_semantic: list, tmp_path:str, df_name:str, score_
 
 
 
-'''
-definition:
-    create fig object for events clusters with function fig.show() for plotting
-input: 
-    df: pandas.DataFrame - dataframe of events with some labels and columns 'x' and 'y'
-    color: int or str - name of df.columns with labels
-    hover_name: str - name of df.columns with hover names
-output: 
-    plolty.express.figure
-'''
 def plot_events(df: pd.DataFrame, color:str or int, hover_name='title'):
+    '''
+    definition:
+        create fig object for events clusters with function fig.show() for plotting
+    input: 
+        df: pandas.DataFrame - dataframe of events with some labels and columns 'x' and 'y'
+        color: int or str - name of df.columns with labels
+        hover_name: str - name of df.columns with hover names
+    output: 
+        plolty.express.figure
+    '''
     return px.scatter(df, x="x", y="y", color=str(color), hover_name=hover_name)
 
 
 
-'''
-definition:
-    calculate cenrtoids for events clustering with most popular hashtags for given number of clusters
-input: 
-    df: pandas.DataFrame - dataframe of events with columns 'x' and 'y'
-    n: int - the number of clusters
-    hashtags_size: int - the count of the most popular hashtags to collect
-output: 
-    df_centroids: pandas.DataFrame - dataframe of centoids with their 2d coodinates, labes, size of events, and the most popular hashtags from events of this cluster
-'''
 def calc_centroids(df: pd.DataFrame, n:int, hashtags_size=15):
+    '''
+    definition:
+        calculate cenrtoids for events clustering with most popular hashtags for given number of clusters
+    input: 
+        df: pandas.DataFrame - dataframe of events with columns 'x' and 'y'
+        n: int - the number of clusters
+        hashtags_size: int - the count of the most popular hashtags to collect
+    output: 
+        df_centroids: pandas.DataFrame - dataframe of centoids with their 2d coodinates, labes, size of events, and the most popular hashtags from events of this cluster
+    '''
     from collections import Counter 
     df_centroids = pd.DataFrame([], columns=['x', 'y', 'label', 'hover_name', 'name', 'size', 'hashtags'])
 
@@ -360,20 +363,20 @@ def calc_centroids(df: pd.DataFrame, n:int, hashtags_size=15):
 
 
 
-'''
-definition:
-    create fig object for events centroids with function fig.show() for plotting
-input: 
-    df_centroids: pandas.DataFrame - dataframe of events centoids
-    size_max: int - max size of centroids points on the figure
-    size_text_tags: int - the number of hashtags written on centroids
-    min_size: int - minimum numbers events in centroids, clusters with size < min_size are filtered. It is ignored if max_size is not equal None
-    max_size: int or None: maximal numbers events in centroids, clusters with size > max_size are filtered.
-output: 
-    fig: plolty.express.figure
-    df: pandas.DataFrame - dataframe of filtered centoids. If min_size and max_size have standard values, df is equal df_centroids
-'''
 def plot_centroids(df_centroids, size_max=100, size_text_tags=0, min_size=0, max_size=None):
+    '''
+    definition:
+        create fig object for events centroids with function fig.show() for plotting
+    input: 
+        df_centroids: pandas.DataFrame - dataframe of events centoids
+        size_max: int - max size of centroids points on the figure
+        size_text_tags: int - the number of hashtags written on centroids
+        min_size: int - minimum numbers events in centroids, clusters with size < min_size are filtered. It is ignored if max_size is not equal None
+        max_size: int or None: maximal numbers events in centroids, clusters with size > max_size are filtered.
+    output: 
+        fig: plolty.express.figure
+        df: pandas.DataFrame - dataframe of filtered centoids. If min_size and max_size have standard values, df is equal df_centroids
+    '''
     if max_size == None:
         df = df_centroids[df_centroids['size'] >= min_size]
     else:
@@ -384,19 +387,19 @@ def plot_centroids(df_centroids, size_max=100, size_text_tags=0, min_size=0, max
 
 
 
-'''
-definition:
-    create fig object with line charts for events clustering scores with function fig.show() for plotting
-input: 
-    scores_df: pandas.DataFrame - dataframe of events clustering scores
-    x: str - name of abscissa for scores_df
-    y: str or list(str) - name or names scores for scores_df
-    x_title: str - name of abscissa for plot 
-    y_title: str - name of ordinate for plot
-output: 
-    plolty.express.figure
-'''
 def plot_score(scores_df: pd.DataFrame, y, x='n_clusters', x_title='n clusters', y_title='score value'):
+    '''
+    definition:
+        create fig object with line charts for events clustering scores with function fig.show() for plotting
+    input: 
+        scores_df: pandas.DataFrame - dataframe of events clustering scores
+        x: str - name of abscissa for scores_df
+        y: str or list(str) - name or names scores for scores_df
+        x_title: str - name of abscissa for plot 
+        y_title: str - name of ordinate for plot
+    output: 
+        plolty.express.figure
+    '''
     if type(y) == str:
         y = [y]
     fig = go.Figure() 
@@ -411,19 +414,19 @@ def plot_score(scores_df: pd.DataFrame, y, x='n_clusters', x_title='n clusters',
 
 
 
-'''
-definition:
-    create fig object with surface plot for events clustering scores of semantic model with function fig.show() for plotting
-input: 
-    n_semantic: list - 'y' of figure, different numbers of semantic clusters
-    n_clusters: list - 'y' of figure, different numbers of events clusters
-    tmp_path: str - path to tmp dir
-    name_df: str - name of scores dataframe
-    scores_name: str - name of score
-output: 
-    plolty.express.figure
-'''
 def plot_scores_3d(n_semantic: list, n_clusters: list, tmp_path: str, name_df: str, scores_name='f1', title='', xaxis_title='n clusters', yaxis_title='semantic clusters', zaxis_title='score'):
+    '''
+    definition:
+        create fig object with surface plot for events clustering scores of semantic model with function fig.show() for plotting
+    input: 
+        n_semantic: list - 'y' of figure, different numbers of semantic clusters
+        n_clusters: list - 'y' of figure, different numbers of events clusters
+        tmp_path: str - path to tmp dir
+        name_df: str - name of scores dataframe
+        scores_name: str - name of score
+    output: 
+        plolty.express.figure
+    '''
     x = np.array(n_clusters)
     y = np.array(n_semantic)
     z = []
